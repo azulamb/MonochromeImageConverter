@@ -7,7 +7,6 @@ import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
-import java.util.regex.Pattern;
 
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
@@ -19,6 +18,7 @@ import net.azulite.monochrome.*;
 
 class Main extends TransferHandler implements ActionListener
 {
+	private static final long serialVersionUID = 1L;
 	private JFrame frame;
 	private JLabel path;
 	Converter conv;
@@ -113,10 +113,10 @@ class Main extends TransferHandler implements ActionListener
 	        return false;
 	    }
 
-		// ドロップ処理
 		Transferable t = support.getTransferable();
-		try {
-			// ファイルを受け取る
+		try
+		{
+			@SuppressWarnings("unchecked")
 			List<File> files = (List<File>) t.getTransferData(DataFlavor.javaFileListFlavor);
 
 			this.open( files.get( 0 ) );
