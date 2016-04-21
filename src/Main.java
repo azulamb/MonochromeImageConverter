@@ -1,26 +1,32 @@
 import java.awt.BorderLayout;
+import java.awt.GridLayout;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
-import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.dnd.*;
 import java.io.File;
-import java.io.IOException;
 import java.util.List;
 
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
-import javax.swing.TransferHandler;
+import javax.swing.JPanel;
+import javax.swing.JSlider;
+import javax.swing.JTextField;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 
 import net.azulite.monochrome.*;
 
-class Main extends TransferHandler implements ActionListener
+class Main extends DropTargetAdapter implements ActionListener, ChangeListener
 {
 	private static final long serialVersionUID = 1L;
 	private JFrame frame;
 	private JLabel path;
+	private JSlider slider;
+	private JTextField threshold;
 	Converter conv;
 
 	public static void main( String[] arg )
@@ -39,21 +45,58 @@ class Main extends TransferHandler implements ActionListener
 
 		this.frame.setLayout( new BorderLayout() );
 
+		// Top
 		JButton infile = new JButton( "Open file" );
 		infile.addActionListener( this );
 		infile.setActionCommand( "open" );
 		this.frame.add( BorderLayout.NORTH, infile );
 
-		this.path = new JLabel( "none" );
-		this.frame.add( BorderLayout.CENTER, this.path );
-		this.path.setTransferHandler( this );
+		// Center
+		JPanel panel = new JPanel();
+		panel.setLayout( new BorderLayout() );
+		this.frame.add( BorderLayout.CENTER, panel );
 
+		this.path = new JLabel( "Drop image file." );
+		this.path.setHorizontalAlignment( JLabel.CENTER );
+		panel.add( BorderLayout.NORTH, this.path );
+
+		// Slider
+		JPanel spanel = new JPanel();
+		spanel.setLayout( new BorderLayout() );
+		panel.add( BorderLayout.SOUTH, spanel );
+
+		this.slider = new JSlider( 0, 255 );
+		this.slider.addChangeListener( this );
+		spanel.add( BorderLayout.CENTER, this.slider );
+
+		JButton sub = new JButton( "<" );
+		sub.addActionListener( this );
+		sub.setActionCommand( "<" );
+		spanel.add( BorderLayout.WEST, sub );
+
+		JButton add = new JButton( ">" );
+		add.addActionListener( this );
+		add.setActionCommand( ">" );
+		spanel.add( BorderLayout.EAST, add );
+
+		// Config
+		JPanel config = new JPanel();
+		panel.add( BorderLayout.CENTER, config );
+		config.setLayout( new GridLayout( 1, 2 ) );
+
+		config.add( new JLabel( "Threshold" ) );
+		this.threshold = new JTextField();
+		config.add( this.threshold );
+		this.threshold.setEditable( false );
+		this.updateThreshold( slider.getValue() );
+
+		// Bottom
 		JButton convert = new JButton( "Convert" );
 		convert.addActionListener( this );
 		convert.setActionCommand( "convert" );
 		this.frame.add( BorderLayout.SOUTH, convert );
 
-		//frame.setTransferHandler( this );
+		this.frame.setDropTarget( new DropTarget( panel, this ) );
 
 		this.frame.pack();
 		this.frame.setVisible( true );
@@ -63,7 +106,7 @@ class Main extends TransferHandler implements ActionListener
 	{
 		if ( this.conv == null )
 		{
-			this.path.setText( "Error: Please choose file." );
+			this.path.setText( "Failure: Please choose file." );
 			return;
 		}
 		File output = new File( this.path.getText() + ".bmp" );
@@ -72,13 +115,12 @@ class Main extends TransferHandler implements ActionListener
 			this.path.setText( "Success: " + output.getPath() );
 		} else
 		{
-			this.path.setText( "Failure: " + output.getPath() );
+			this.path.setText( "Failure: " + this.conv.getError() + "|" + output.getPath() );
 		}
 	}
 
 	private void open()
 	{
-		this.conv = new Converter();
 		JFileChooser filechooser = new JFileChooser();
 
 		int selected = filechooser.showOpenDialog( this.frame );
@@ -90,41 +132,71 @@ class Main extends TransferHandler implements ActionListener
 
 	private void open( File input )
 	{
-		conv.load( input );
+		if ( this.conv == null )
+		{
+			this.conv = new Converter();
+			this.conv.setThreshold( this.slider.getValue() );
+		}
+		if ( this.conv.load( input ) )
+		{
+			this.path.setText( "Failure: Cannot load image." );
+		}
 		this.path.setText( input.getPath() );
+	}
+
+	private void updateThreshold( int newval )
+	{
+
+		if ( newval < 0 || 255 < newval ){ return; }
+		this.slider.setValue( newval );
+		this.threshold.setText( String.valueOf( this.slider.getValue() ) );
+		if ( this.conv == null ){ return; }
+		this.conv.setThreshold( this.slider.getValue() );
 	}
 
 	@Override
 	public void actionPerformed( ActionEvent event )
 	{
 		System.out.println( event.getActionCommand() );
-		if ( event.getActionCommand().equals( "open" ) )
+		String cmd = event.getActionCommand();
+		if ( cmd.equals( "open" ) )
 		{
 			this.open();
-		} else if ( event.getActionCommand().equals( "convert" ) )
+		} else if ( cmd.equals( "convert" ) )
 		{
 			this.convert();
+		} else if( cmd.equals( "<" ) )
+		{
+			this.updateThreshold( this.slider.getValue() - 1 );
+		} else if( cmd.equals( ">" ) )
+		{
+			this.updateThreshold( this.slider.getValue() + 1 );
 		}
 	}
 
 	@Override
-	public boolean importData(TransferSupport support) {
-		if (!canImport(support)) {
-	        return false;
-	    }
-
-		Transferable t = support.getTransferable();
+	public void drop( DropTargetDropEvent event )
+	{
 		try
 		{
-			@SuppressWarnings("unchecked")
-			List<File> files = (List<File>) t.getTransferData(DataFlavor.javaFileListFlavor);
-
-			this.open( files.get( 0 ) );
-
-		} catch (UnsupportedFlavorException | IOException e) {
+			Transferable t = event.getTransferable();
+			if ( t.isDataFlavorSupported( DataFlavor.javaFileListFlavor ) )
+			{
+				event.acceptDrop( DnDConstants.ACTION_COPY_OR_MOVE );
+				@SuppressWarnings("unchecked")
+				List<File> files = (List<File>)(t.getTransferData(DataFlavor.javaFileListFlavor));
+				this.open( files.get( 0 ) );
+			}
+		} catch ( Exception e )
+		{
 			e.printStackTrace();
 		}
-		return true;
+	}
+
+	@Override
+	public void stateChanged( ChangeEvent event )
+	{
+		this.updateThreshold( this.slider.getValue() );
 	}
 }
 

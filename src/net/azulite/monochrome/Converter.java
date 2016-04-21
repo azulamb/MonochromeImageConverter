@@ -11,16 +11,28 @@ import javax.imageio.ImageIO;
 public class Converter {
 	private int threshold;
 	private BufferedImage readImage;
+	String error;
 
 	public Converter()
 	{
 		this.readImage = null;
-		this.setThreshold( 128 );
+		this.setThreshold( 127 );
+		this.error = "";
 	}
 
 	public void setThreshold( int threshold )
 	{
 		this.threshold = threshold;
+	}
+
+	public int getThreshold()
+	{
+		return this.threshold;
+	}
+
+	public String getError()
+	{
+		return this.error;
 	}
 
 	public boolean load( File input )
@@ -31,26 +43,30 @@ public class Converter {
 		} catch ( Exception e )
 		{
 			e.printStackTrace();
+			this.error = "Load error.";
 			return false;
 		}
 		return true;
 	}
 
-	private int alphaBlend( int c, float a ){
+	private int alphaBlend( int c, float a )
+	{
 		return (int)( 255 * ( 1 - a ) + c * a );
 	}
 
 	public boolean convert( File output )
 	{
-		if ( this.readImage == null ){ return false; }
+		if ( this.readImage == null ){
+			this.error = "No image.";
+			return false;
+		}
 
-		//Graphics g = this.readImage.getGraphics();
 		int w = this.readImage.getWidth();
 		int h = this.readImage.getHeight();
 		int c, r, g, b, min, max;
 		float a;
 
-		BufferedImage write = new BufferedImage( w, h, BufferedImage.TYPE_BYTE_BINARY);
+		BufferedImage write = new BufferedImage( w, h, BufferedImage.TYPE_BYTE_BINARY );
 		Graphics graph = write.getGraphics();
 
 		for (int y = 0; y < h; y++) {
@@ -83,6 +99,7 @@ public class Converter {
 		} catch ( IOException e )
 		{
 			e.printStackTrace();
+			this.error = "Write error.";
 			return false;
 		}
 
